@@ -1,0 +1,413 @@
+import javax.swing.*;
+import java.awt.*;
+import java.io.*;
+
+public class Main {
+    public static void main(String[] args) {
+        // Create necessary data files if they don't exist
+        createRequiredFiles();
+
+        SwingUtilities.invokeLater(() -> {
+            LoginFrame loginFrame = new LoginFrame();
+            loginFrame.setVisible(true);
+        });
+    }
+
+    private static void createRequiredFiles() {
+        String[] fileNames = {"users.csv", "police_officers.csv", "crime_reports.csv", "police_records.csv"};
+
+        for (String fileName : fileNames) {
+            File file = new File(fileName);
+            try {
+                if (!file.exists()) {
+                    file.createNewFile();
+                    System.out.println("Created file: " + fileName);
+
+                    // Add default police officer for testing
+                    if (fileName.equals("police_officers.csv") && file.length() == 0) {
+                        FileWriter fw = new FileWriter(file);
+                        fw.write("admin,admin123,Admin Officer");
+                        fw.close();
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Error creating file " + fileName + ": " + e.getMessage());
+            }
+        }
+    }
+}
+
+// File: LoginFrame.java
+import javax.swing.*;
+        import java.awt.*;
+        import java.awt.event.*;
+        import java.io.*;
+
+public class LoginFrame extends JFrame {
+    private JTextField usernameField;
+    private JPasswordField passwordField;
+    private JButton loginButton, registerButton;
+    private JComboBox<String> userTypeComboBox;
+
+    public LoginFrame() {
+        setTitle("CRMS - Login/Registration");
+        setSize(400, 300);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BorderLayout(10, 10));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JPanel formPanel = new JPanel();
+        formPanel.setLayout(new GridLayout(4, 2, 10, 10));
+
+        JLabel userTypeLabel = new JLabel("User Type:");
+        String[] userTypes = {"Normal User", "Police Officer"};
+        userTypeComboBox = new JComboBox<>(userTypes);
+
+        JLabel usernameLabel = new JLabel("Username:");
+        usernameField = new JTextField(20);
+
+        JLabel passwordLabel = new JLabel("Password:");
+        passwordField = new JPasswordField(20);
+
+        formPanel.add(userTypeLabel);
+        formPanel.add(userTypeComboBox);
+        formPanel.add(usernameLabel);
+        formPanel.add(usernameField);
+        formPanel.add(passwordLabel);
+        formPanel.add(passwordField);
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 10, 0));
+
+        loginButton = new JButton("Login");
+        registerButton = new JButton("Register");
+
+        buttonPanel.add(loginButton);
+        buttonPanel.add(registerButton);
+
+        formPanel.add(new JLabel(""));
+        formPanel.add(buttonPanel);
+
+        JLabel titleLabel = new JLabel("Crime Report Management System");
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
+        titleLabel.setHorizontalAlignment(JLabel.CENTER);
+
+        mainPanel.add(titleLabel, BorderLayout.NORTH);
+        mainPanel.add(formPanel, BorderLayout.CENTER);
+
+        add(mainPanel);
+
+        // Add action listeners
+        loginButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String username = usernameField.getText();
+                String password = new String(passwordField.getPassword());
+                String userType = (String) userTypeComboBox.getSelectedItem();
+
+                if (username.isEmpty() || password.isEmpty()) {
+                    JOptionPane.showMessageDialog(LoginFrame.this,
+                            "Please enter username and password", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                boolean isAuthenticated = false;
+
+                if (userType.equals("Police Officer")) {
+                    isAuthenticated = authenticatePoliceOfficer(username, password);
+                    if (isAuthenticated) {
+                        JOptionPane.showMessageDialog(LoginFrame.this,
+                                "Police officer login successful!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                        openPoliceOfficerDashboard(username);
+                    } else {
+                        JOptionPane.showMessageDialog(LoginFrame.this,
+                                "Invalid credentials for police officer!", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                } else { // Normal User
+                    isAuthenticated = authenticateUser(username, password);
+                    if (isAuthenticated) {
+                        JOptionPane.showMessageDialog(LoginFrame.this,
+                                "User login successful!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                        openUserDashboard(username);
+                    } else {
+                        JOptionPane.showMessageDialog(LoginFrame.this,
+                                "Invalid credentials for user!", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            }
+        });
+
+        registerButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String userType = (String) userTypeComboBox.getSelectedItem();
+                if (userType.equals("Normal User")) {
+                    openRegistrationForm();
+                } else {
+                    JOptionPane.showMessageDialog(LoginFrame.this,
+                            "Police officer registration requires authorization. Please contact administrator.",
+                            "Information", JOptionPane.INFORMATION_MESSAGE);
+                }
+            }
+        });
+    }
+
+    private boolean authenticatePoliceOfficer(String username, String password) {
+        try (BufferedReader reader = new BufferedReader(new FileReader("police_officers.csv"))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length >= 2 && parts[0].equals(username) && parts[1].equals(password)) {
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading police officers file: " + e.getMessage());
+        }
+        return false;
+    }
+
+    private boolean authenticateUser(String username, String password) {
+        try (BufferedReader reader = new BufferedReader(new FileReader("users.csv"))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length >= 2 && parts[0].equals(username) && parts[1].equals(password)) {
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading users file: " + e.getMessage());
+        }
+        return false;
+    }
+
+    private void openPoliceOfficerDashboard(String username) {
+        PoliceOfficerDashboard dashboard = new PoliceOfficerDashboard(username);
+        dashboard.setVisible(true);
+        this.dispose();
+    }
+
+    private void openUserDashboard(String username) {
+        UserDashboard dashboard = new UserDashboard(username);
+        dashboard.setVisible(true);
+        this.dispose();
+    }
+
+    private void openRegistrationForm() {
+        RegistrationFrame registrationFrame = new RegistrationFrame();
+        registrationFrame.setVisible(true);
+        this.dispose();
+    }
+}
+
+// File: RegistrationFrame.java
+import javax.swing.*;
+        import java.awt.*;
+        import java.awt.event.*;
+        import java.io.*;
+
+public class RegistrationFrame extends JFrame {
+    private JTextField usernameField, phoneField, nationalIdField;
+    private JPasswordField passwordField, confirmPasswordField;
+    private JButton registerButton, backButton;
+
+    public RegistrationFrame() {
+        setTitle("CRMS - User Registration");
+        setSize(450, 350);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BorderLayout(10, 10));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel titleLabel = new JLabel("User Registration");
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
+        titleLabel.setHorizontalAlignment(JLabel.CENTER);
+
+        JPanel formPanel = new JPanel();
+        formPanel.setLayout(new GridLayout(6, 2, 10, 10));
+
+        JLabel usernameLabel = new JLabel("Username:");
+        usernameField = new JTextField(20);
+
+        JLabel passwordLabel = new JLabel("Password:");
+        passwordField = new JPasswordField(20);
+
+        JLabel confirmPasswordLabel = new JLabel("Confirm Password:");
+        confirmPasswordField = new JPasswordField(20);
+
+        JLabel phoneLabel = new JLabel("Phone Number:");
+        phoneField = new JTextField(20);
+
+        JLabel nationalIdLabel = new JLabel("National ID:");
+        nationalIdField = new JTextField(20);
+
+        formPanel.add(usernameLabel);
+        formPanel.add(usernameField);
+        formPanel.add(passwordLabel);
+        formPanel.add(passwordField);
+        formPanel.add(confirmPasswordLabel);
+        formPanel.add(confirmPasswordField);
+        formPanel.add(phoneLabel);
+        formPanel.add(phoneField);
+        formPanel.add(nationalIdLabel);
+        formPanel.add(nationalIdField);
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 10, 0));
+
+        registerButton = new JButton("Register");
+        backButton = new JButton("Back to Login");
+
+        buttonPanel.add(registerButton);
+        buttonPanel.add(backButton);
+
+        formPanel.add(new JLabel(""));
+        formPanel.add(buttonPanel);
+
+        mainPanel.add(titleLabel, BorderLayout.NORTH);
+        mainPanel.add(formPanel, BorderLayout.CENTER);
+
+        add(mainPanel);
+
+        // Add action listeners
+        registerButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String username = usernameField.getText();
+                String password = new String(passwordField.getPassword());
+                String confirmPassword = new String(confirmPasswordField.getPassword());
+                String phone = phoneField.getText();
+                String nationalId = nationalIdField.getText();
+
+                if (username.isEmpty() || password.isEmpty() || confirmPassword.isEmpty() ||
+                        phone.isEmpty() || nationalId.isEmpty()) {
+                    JOptionPane.showMessageDialog(RegistrationFrame.this,
+                            "All fields are required", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                if (!password.equals(confirmPassword)) {
+                    JOptionPane.showMessageDialog(RegistrationFrame.this,
+                            "Passwords do not match", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                if (userExists(username)) {
+                    JOptionPane.showMessageDialog(RegistrationFrame.this,
+                            "Username already exists", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                if (registerUser(username, password, phone, nationalId)) {
+                    JOptionPane.showMessageDialog(RegistrationFrame.this,
+                            "Registration successful!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                    backToLogin();
+                } else {
+                    JOptionPane.showMessageDialog(RegistrationFrame.this,
+                            "Registration failed, please try again", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        backButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                backToLogin();
+            }
+        });
+    }
+
+    private boolean userExists(String username) {
+        try (BufferedReader reader = new BufferedReader(new FileReader("users.csv"))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length > 0 && parts[0].equals(username)) {
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error checking if user exists: " + e.getMessage());
+        }
+        return false;
+    }
+
+    private boolean registerUser(String username, String password, String phone, String nationalId) {
+        try {
+            // Create users file if it doesn't exist
+            File usersFile = new File("users.csv");
+            if (!usersFile.exists()) {
+                usersFile.createNewFile();
+            }
+
+            // Append new user
+            FileWriter fw = new FileWriter(usersFile, true);
+            BufferedWriter bw = new BufferedWriter(fw);
+            bw.write(username + "," + password + "," + phone + "," + nationalId);
+            bw.newLine();
+            bw.close();
+            return true;
+        } catch (IOException e) {
+            System.err.println("Error registering user: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private void backToLogin() {
+        LoginFrame loginFrame = new LoginFrame();
+        loginFrame.setVisible(true);
+        this.dispose();
+    }
+}
+
+// File: UserDashboard.java
+import javax.swing.*;
+        import java.awt.*;
+        import java.awt.event.*;
+        import java.io.*;
+        import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+public class UserDashboard extends JFrame {
+    private JTabbedPane tabbedPane;
+    private JPanel reportCrimePanel, trackCasesPanel;
+    private JTextField reportIdField;
+    private JTextArea caseDetailsArea;
+    private JComboBox<String> crimeTypeComboBox;
+    private JTextField locationField, dateTimeField, reporterInfoField;
+    private JTextArea descriptionArea;
+    private JTextField evidenceField;
+    private JButton submitButton, trackButton, logoutButton;
+    private String currentUser;
+
+    public UserDashboard(String username) {
+        this.currentUser = username;
+        setTitle("CRMS - User Dashboard");
+        setSize(600, 500);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        tabbedPane = new JTabbedPane();
+
+        // Report Crime Panel
+        reportCrimePanel = createReportCrimePanel();
+        tabbedPane.addTab("Report Crime", reportCrimePanel);
+
+        // Track Cases Panel
+        trackCasesPanel = createTrackCasesPanel();
+        tabbedPane.addTab("Track Case Status", trackCasesPanel);
+
+        // Logout button
+        logoutButton = new JButton("Logout");
+        logoutButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                logout();
